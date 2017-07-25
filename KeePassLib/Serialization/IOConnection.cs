@@ -387,7 +387,7 @@ namespace KeePassLib.Serialization
 			catch(Exception) { Debug.Assert(false); }
 		}
 
-		private static bool GetWebProxy(out IWebProxy prx)
+		public static bool GetWebProxy(out IWebProxy prx)
 		{
 			bool b = GetWebProxyServer(out prx);
 			if(b) AssignCredentials(prx);
