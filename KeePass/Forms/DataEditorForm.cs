@@ -1,6 +1,6 @@
 ﻿/*
   KeePass Password Safe - The Open-Source Password Manager
-  Copyright (C) 2003-2017 Dominik Reichl <dominik.reichl@t-online.de>
+  Copyright (C) 2003-2018 Dominik Reichl <dominik.reichl@t-online.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -156,7 +156,7 @@ namespace KeePass.Forms
 				{
 					if(strData.Length > 0)
 					{
-						m_rtbText.Rtf = strData;
+						m_rtbText.Rtf = StrUtil.RtfFix(strData);
 						bDefaultFont = false;
 					}
 					else m_rtbText.Text = string.Empty;
@@ -218,7 +218,7 @@ namespace KeePass.Forms
 
 			this.Text = (((m_strDataDesc.Length > 0) ? (m_strDataDesc +
 				(m_bModified ? "*" : string.Empty) + " - ") : string.Empty) +
-				PwDefs.ShortProductName + " " + KPRes.DataEditor);
+				KPRes.DataEditorKP);
 
 			// m_menuViewFont.Enabled = (m_bdc == BinaryDataClass.Text);
 			UIUtil.SetChecked(m_menuViewWordWrap, m_rtbText.WordWrap);
@@ -275,7 +275,7 @@ namespace KeePass.Forms
 		private void OnFileSave(object sender, EventArgs e)
 		{
 			if(m_bdc == BinaryDataClass.RichText)
-				m_pbEditedData = StrUtil.Utf8.GetBytes(m_rtbText.Rtf);
+				m_pbEditedData = StrUtil.Utf8.GetBytes(StrUtil.RtfFix(m_rtbText.Rtf));
 			else
 			{
 				string strData = m_rtbText.Text;
@@ -409,11 +409,6 @@ namespace KeePass.Forms
 			}
 		}
 
-		private void OnTextLinkClicked(object sender, LinkClickedEventArgs e)
-		{
-			WinUtil.OpenUrl(e.LinkText, null);
-		}
-
 		private void OnFileExit(object sender, EventArgs e)
 		{
 			this.DialogResult = DialogResult.OK;
@@ -509,14 +504,20 @@ namespace KeePass.Forms
 
 		private void OnFontComboKeyDown(object sender, KeyEventArgs e)
 		{
-			if((e.KeyCode == Keys.Enter) || (e.KeyCode == Keys.Return))
+			if(e.KeyCode == Keys.Return) // Return == Enter
+			{
+				UIUtil.SetHandled(e, true);
 				OnFontComboSelectedIndexChanged(sender, e);
+			}
 		}
 
 		private void OnFontSizeComboKeyDown(object sender, KeyEventArgs e)
 		{
-			if((e.KeyCode == Keys.Enter) || (e.KeyCode == Keys.Return))
+			if(e.KeyCode == Keys.Return) // Return == Enter
+			{
+				UIUtil.SetHandled(e, true);
 				OnFontSizeComboSelectedIndexChanged(sender, e);
+			}
 		}
 
 		private void OnEditCut(object sender, EventArgs e)
@@ -630,17 +631,16 @@ namespace KeePass.Forms
 
 		private void OnTextFindKeyDown(object sender, KeyEventArgs e)
 		{
-			if((e.KeyCode == Keys.Enter) || (e.KeyCode == Keys.Return))
+			if(e.KeyCode == Keys.Return) // Return == Enter
 			{
 				UIUtil.SetHandled(e, true);
-
 				OnTextFind();
 			}
 		}
 
 		private void OnTextFindKeyUp(object sender, KeyEventArgs e)
 		{
-			if((e.KeyCode == Keys.Enter) || (e.KeyCode == Keys.Return))
+			if(e.KeyCode == Keys.Return) // Return == Enter
 				UIUtil.SetHandled(e, true);
 		}
 

@@ -1,6 +1,6 @@
 /*
   KeePass Password Safe - The Open-Source Password Manager
-  Copyright (C) 2003-2017 Dominik Reichl <dominik.reichl@t-online.de>
+  Copyright (C) 2003-2018 Dominik Reichl <dominik.reichl@t-online.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -19,12 +19,12 @@
 
 using System;
 using System.Collections.Generic;
-using System.Text;
-using System.IO;
-using System.Windows.Forms;
 using System.Diagnostics;
-using System.Xml;
+using System.IO;
+using System.Text;
 using System.Threading;
+using System.Windows.Forms;
+using System.Xml;
 
 using KeePass.App;
 using KeePass.DataExchange.Formats;
@@ -112,7 +112,7 @@ namespace KeePass.DataExchange
 				try { fmtImp.Import(pwDatabase, null, dlgStatus); }
 				catch(Exception exSingular)
 				{
-					if((exSingular.Message != null) && (exSingular.Message.Length > 0))
+					if(!string.IsNullOrEmpty(exSingular.Message))
 					{
 						// slf.SetText(exSingular.Message, LogStatusType.Warning);
 						MessageService.ShowWarning(exSingular);
@@ -171,12 +171,10 @@ namespace KeePass.DataExchange
 
 					MessageService.ShowWarning(strMsgEx);
 
-					s.Close();
 					bAllSuccess = false;
 					continue;
 				}
-
-				s.Close();
+				finally { s.Close(); }
 
 				if(bUseTempDb)
 				{
@@ -555,23 +553,22 @@ namespace KeePass.DataExchange
 			bool bProtect = ((pdContext == null) ? false :
 				pdContext.MemoryProtection.GetProtection(strName));
 
-			ProtectedString ps = pe.Strings.Get(strName);
-			string strPrev = ((ps != null) ? ps.ReadString() : null);
-			if(ps != null) bProtect = ps.IsProtected;
+			ProtectedString psPrev = pe.Strings.Get(strName);
+			if(psPrev != null) bProtect = psPrev.IsProtected;
+			else psPrev = ProtectedString.Empty; // Protection-neutral for '+'
 
-			strValue = (strValue ?? string.Empty);
-			if(string.IsNullOrEmpty(strPrev))
-				pe.Strings.Set(strName, new ProtectedString(bProtect, strValue));
-			else if(strValue.Length > 0)
+			ProtectedString psValue = new ProtectedString(bProtect, strValue ?? string.Empty);
+
+			if(psPrev.IsEmpty) pe.Strings.Set(strName, psValue);
+			else if(!psValue.IsEmpty)
 			{
 				bool bAppend = true;
 
 				if(bOnlyIfNotDup)
-					bAppend &= (strPrev != strValue);
+					bAppend &= !psPrev.Equals(psValue, false);
 
 				if(bAppend)
-					pe.Strings.Set(strName, new ProtectedString(bProtect,
-						strPrev + strSeparator + strValue));
+					pe.Strings.Set(strName, (psPrev + strSeparator) + psValue);
 			}
 		}
 

@@ -1,6 +1,6 @@
 /*
   KeePass Password Safe - The Open-Source Password Manager
-  Copyright (C) 2003-2017 Dominik Reichl <dominik.reichl@t-online.de>
+  Copyright (C) 2003-2018 Dominik Reichl <dominik.reichl@t-online.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
 
@@ -58,11 +59,30 @@ namespace KeePassLib.Cryptography
 		/// </summary>
 		public static void Perform()
 		{
+#if KeePassUAP
+			Debug.Assert(Marshal.SizeOf<int>() == 4);
+			Debug.Assert(Marshal.SizeOf<uint>() == 4);
+			Debug.Assert(Marshal.SizeOf<long>() == 8);
+			Debug.Assert(Marshal.SizeOf<ulong>() == 8);
+			Debug.Assert(Marshal.SizeOf<IntPtr>() == IntPtr.Size);
+#else
+			Debug.Assert(Marshal.SizeOf(typeof(int)) == 4);
+			Debug.Assert(Marshal.SizeOf(typeof(uint)) == 4);
+			Debug.Assert(Marshal.SizeOf(typeof(long)) == 8);
+			Debug.Assert(Marshal.SizeOf(typeof(ulong)) == 8);
+			Debug.Assert(Marshal.SizeOf(typeof(IntPtr)) == IntPtr.Size);
+#endif
+			Debug.Assert((IntPtr.Size == 4) || (IntPtr.Size == 8));
+
+			Debug.Assert((int)PwIcon.World == 1);
+			Debug.Assert((int)PwIcon.Warning == 2);
+			Debug.Assert((int)PwIcon.BlackBerry == 68);
+
 			Random r = CryptoRandom.NewWeakRandom();
 
 			TestFipsComplianceProblems(); // Must be the first test
 
-			TestRijndael();
+			TestAes();
 			TestSalsa20(r);
 			TestChaCha20(r);
 			TestBlake2b(r);
@@ -78,10 +98,6 @@ namespace KeePassLib.Cryptography
 			TestMemUtil(r);
 			TestStrUtil();
 			TestUrlUtil();
-
-			Debug.Assert((int)PwIcon.World == 1);
-			Debug.Assert((int)PwIcon.Warning == 2);
-			Debug.Assert((int)PwIcon.BlackBerry == 68);
 
 #if KeePassUAP
 			SelfTestEx.Perform();
@@ -105,7 +121,7 @@ namespace KeePassLib.Cryptography
 			}
 		}
 
-		private static void TestRijndael()
+		private static void TestAes()
 		{
 			// Test vector (official ECB test vector #356)
 			byte[] pbIV = new byte[16];
@@ -128,19 +144,18 @@ namespace KeePassLib.Cryptography
 				throw new SecurityException("AES (BC)");
 			r.ProcessBlock(pbTestData, 0, pbTestData, 0);
 #else
-			RijndaelManaged r = new RijndaelManaged();
-
-			if(r.BlockSize != 128) // AES block size
+			SymmetricAlgorithm a = CryptoUtil.CreateAes();
+			if(a.BlockSize != 128) // AES block size
 			{
 				Debug.Assert(false);
-				r.BlockSize = 128;
+				a.BlockSize = 128;
 			}
 
-			r.IV = pbIV;
-			r.KeySize = 256;
-			r.Key = pbTestKey;
-			r.Mode = CipherMode.ECB;
-			ICryptoTransform iCrypt = r.CreateEncryptor();
+			a.IV = pbIV;
+			a.KeySize = 256;
+			a.Key = pbTestKey;
+			a.Mode = CipherMode.ECB;
+			ICryptoTransform iCrypt = a.CreateEncryptor();
 
 			iCrypt.TransformBlock(pbTestData, 0, 16, pbTestData, 0);
 #endif
@@ -826,6 +841,21 @@ namespace KeePassLib.Cryptography
 				throw new Exception("MemUtil-9");
 			if(MemUtil.BytesToInt32(pbRes) != i)
 				throw new Exception("MemUtil-10");
+
+			ArrayHelperEx<char> ah = MemUtil.ArrayHelperExOfChar;
+			for(int j = 0; j < 30; ++j)
+			{
+				string strA = r.Next(30).ToString();
+				string strB = r.Next(30).ToString();
+				char[] vA = strA.ToCharArray();
+				char[] vB = strB.ToCharArray();
+
+				if(ah.Equals(vA, vB) != string.Equals(strA, strB))
+					throw new Exception("MemUtil-11");
+				if((vA.Length == vB.Length) && (Math.Sign(ah.Compare(vA, vB)) !=
+					Math.Sign(string.CompareOrdinal(strA, strB))))
+					throw new Exception("MemUtil-12");
+			}
 #endif
 		}
 
@@ -933,6 +963,14 @@ namespace KeePassLib.Cryptography
 				if(ps.ReadString() != str)
 					throw new SecurityException("ProtectedString-14");
 			}
+
+			ps = new ProtectedString(false, "ABCD");
+			ps2 = new ProtectedString(true, "EFG");
+			ps += (ps2 + "HI");
+			if(!ps.Equals(new ProtectedString(true, "ABCDEFGHI"), true))
+				throw new SecurityException("ProtectedString-15");
+			if(!ps.Equals(new ProtectedString(false, "ABCDEFGHI"), false))
+				throw new SecurityException("ProtectedString-16");
 #endif
 		}
 
@@ -1030,6 +1068,30 @@ namespace KeePassLib.Cryptography
 				throw new InvalidOperationException("StrUtil-Case1");
 			if(string.Equals(@"a<b", @"a>b", StrUtil.CaseIgnoreCmp))
 				throw new InvalidOperationException("StrUtil-Case2");
+
+			const string strNL = "\n01\r23\n45\r\n67\r";
+			string strW = StrUtil.NormalizeNewLines(strNL, true);
+			string strL = StrUtil.NormalizeNewLines(strNL, false);
+			if(strW != "\r\n01\r\n23\r\n45\r\n67\r\n")
+				throw new InvalidOperationException("StrUtil-NewLine1");
+			if(strL != "\n01\n23\n45\n67\n")
+				throw new InvalidOperationException("StrUtil-NewLine2");
+			if(StrUtil.IsNewLineNormalized(strNL.ToCharArray(), true))
+				throw new InvalidOperationException("StrUtil-NewLine3");
+			if(StrUtil.IsNewLineNormalized(strNL.ToCharArray(), false))
+				throw new InvalidOperationException("StrUtil-NewLine4");
+			if(!StrUtil.IsNewLineNormalized(strW.ToCharArray(), true))
+				throw new InvalidOperationException("StrUtil-NewLine5");
+			if(StrUtil.IsNewLineNormalized(strW.ToCharArray(), false))
+				throw new InvalidOperationException("StrUtil-NewLine6");
+			if(StrUtil.IsNewLineNormalized(strL.ToCharArray(), true))
+				throw new InvalidOperationException("StrUtil-NewLine7");
+			if(!StrUtil.IsNewLineNormalized(strL.ToCharArray(), false))
+				throw new InvalidOperationException("StrUtil-NewLine8");
+			if(!StrUtil.IsNewLineNormalized(string.Empty.ToCharArray(), true))
+				throw new InvalidOperationException("StrUtil-NewLine9");
+			if(!StrUtil.IsNewLineNormalized(string.Empty.ToCharArray(), false))
+				throw new InvalidOperationException("StrUtil-NewLine10");
 #endif
 		}
 
@@ -1044,7 +1106,7 @@ namespace KeePassLib.Cryptography
 			if(UrlUtil.GetHost(@"scheme://domain:port/path?query_string#fragment_id") !=
 				"domain")
 				throw new InvalidOperationException("UrlUtil-H1");
-			if(UrlUtil.GetHost(@"http://example.org:80") != "example.org")
+			if(UrlUtil.GetHost(@"https://example.org:443") != "example.org")
 				throw new InvalidOperationException("UrlUtil-H2");
 			if(UrlUtil.GetHost(@"mailto:bob@example.com") != "example.com")
 				throw new InvalidOperationException("UrlUtil-H3");

@@ -1,6 +1,6 @@
 ﻿/*
   KeePass Password Safe - The Open-Source Password Manager
-  Copyright (C) 2003-2017 Dominik Reichl <dominik.reichl@t-online.de>
+  Copyright (C) 2003-2018 Dominik Reichl <dominik.reichl@t-online.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -43,12 +43,12 @@ namespace KeePass.Ecas
 
 	public static class EcasUtil
 	{
-		public const uint StdCompareEqual = 0;
-		public const uint StdCompareNotEqual = 1;
-		public const uint StdCompareLesser = 2;
-		public const uint StdCompareLesserEqual = 3;
-		public const uint StdCompareGreater = 4;
-		public const uint StdCompareGreaterEqual = 5;
+		public static readonly uint StdCompareEqual = 0;
+		public static readonly uint StdCompareNotEqual = 1;
+		public static readonly uint StdCompareLesser = 2;
+		public static readonly uint StdCompareLesserEqual = 3;
+		public static readonly uint StdCompareGreater = 4;
+		public static readonly uint StdCompareGreaterEqual = 5;
 
 		private static EcasEnum m_enumCompare = null;
 		public static EcasEnum StdCompare
@@ -68,10 +68,10 @@ namespace KeePass.Ecas
 			}
 		}
 
-		public const uint StdStringCompareEquals = 0;
-		public const uint StdStringCompareContains = 1;
-		public const uint StdStringCompareStartsWith = 2;
-		public const uint StdStringCompareEndsWith = 3;
+		public static readonly uint StdStringCompareEquals = 0;
+		public static readonly uint StdStringCompareContains = 1;
+		public static readonly uint StdStringCompareStartsWith = 2;
+		public static readonly uint StdStringCompareEndsWith = 3;
 
 		private static EcasEnum m_enumStringCompare = null;
 		public static EcasEnum StdStringCompare
@@ -113,8 +113,11 @@ namespace KeePass.Ecas
 
 				PwDatabase pd = Program.MainForm.DocumentManager.SafeFindContainerOf(pe);
 
+				// The trigger system does not update the UI itself,
+				// thus ignore state-changing placeholders
 				str = SprEngine.Compile(str, new SprContext(pe, pd,
-					SprCompileFlags.All, false, bSprForCommandLine));
+					(SprCompileFlags.All & ~SprCompileFlags.StateChanging),
+					false, bSprForCommandLine));
 			}
 
 			return str;
@@ -128,6 +131,12 @@ namespace KeePass.Ecas
 			if(iIndex >= vParams.Count) return strDefault; // No assert
 
 			return vParams[iIndex];
+		}
+
+		public static bool GetParamBool(List<string> vParams, int iIndex)
+		{
+			string str = GetParamString(vParams, iIndex, string.Empty);
+			return StrUtil.StringToBool(str);
 		}
 
 		public static uint GetParamUInt(List<string> vParams, int iIndex)

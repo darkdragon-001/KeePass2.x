@@ -1,6 +1,6 @@
 /*
   KeePass Password Safe - The Open-Source Password Manager
-  Copyright (C) 2003-2017 Dominik Reichl <dominik.reichl@t-online.de>
+  Copyright (C) 2003-2018 Dominik Reichl <dominik.reichl@t-online.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -50,7 +50,7 @@ namespace KeePass.Native
 		internal const int WM_NOTIFY = 0x004E;
 
 		// See Control.ReflectMessageInternal;
-		// http://msdn.microsoft.com/en-us/library/eeah46xd.aspx
+		// https://msdn.microsoft.com/en-us/library/eeah46xd.aspx
 		internal const int WM_REFLECT = 0x2000;
 
 		internal const int WM_NOTIFY_REFLECT = (WM_NOTIFY + WM_REFLECT);

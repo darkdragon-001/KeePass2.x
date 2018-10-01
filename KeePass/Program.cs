@@ -1,6 +1,6 @@
 ﻿/*
   KeePass Password Safe - The Open-Source Password Manager
-  Copyright (C) 2003-2017 Dominik Reichl <dominik.reichl@t-online.de>
+  Copyright (C) 2003-2018 Dominik Reichl <dominik.reichl@t-online.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -17,33 +17,38 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
+// #define KP_DEVSNAP
+#if KP_DEVSNAP
+#warning KP_DEVSNAP is defined!
+#endif
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Windows.Forms;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
-using System.Threading;
-using System.Security.AccessControl;
-using System.Security.Principal;
 using System.IO;
 using System.Reflection;
 using System.Resources;
-using System.Diagnostics;
+using System.Security.AccessControl;
+using System.Security.Principal;
+using System.Threading;
+using System.Windows.Forms;
 
 using KeePass.App;
 using KeePass.App.Configuration;
 using KeePass.DataExchange;
+using KeePass.Ecas;
 using KeePass.Forms;
 using KeePass.Native;
+using KeePass.Plugins;
 using KeePass.Resources;
 using KeePass.UI;
 using KeePass.Util;
 using KeePass.Util.Archive;
 using KeePass.Util.XmlSerialization;
-using KeePass.Ecas;
-using KeePass.Plugins;
 
 using KeePassLib;
 using KeePassLib.Cryptography;
@@ -84,7 +89,11 @@ namespace KeePass
 		private static bool m_bDesignModeQueried = false;
 #endif
 
-		public enum AppMessage
+#if KP_DEVSNAP
+		private static bool m_bAsmResReg = false;
+#endif
+
+		public enum AppMessage // int
 		{
 			Null = 0,
 			RestoreWindow = 1,
@@ -232,6 +241,16 @@ namespace KeePass
 		/// </summary>
 		[STAThread]
 		public static void Main(string[] args)
+		{
+#if DEBUG
+			MainPriv(args);
+#else
+			try { MainPriv(args); }
+			catch(Exception ex) { ShowFatal(ex); }
+#endif
+		}
+
+		private static void MainPriv(string[] args)
 		{
 #if DEBUG
 			// Program.DesignMode should not be queried before executing
@@ -500,13 +519,7 @@ namespace KeePass
 				m_formMain = new MainForm();
 				Application.Run(m_formMain);
 			}
-			catch(Exception exPrg)
-			{
-				// Catch message box exception;
-				// https://sourceforge.net/p/keepass/patches/86/
-				try { MessageService.ShowFatal(exPrg); }
-				catch(Exception) { Console.Error.WriteLine(exPrg.ToString()); }
-			}
+			catch(Exception exPrg) { ShowFatal(exPrg); }
 #endif
 
 			Application.RemoveMessageFilter(cmfx);
@@ -542,6 +555,12 @@ namespace KeePass
 			// try { NativeMethods.SetProcessDPIAware(); }
 			// catch(Exception) { }
 
+			// Do not run as AppX, because of compatibility problems
+			// (unless we're a special compatibility build)
+			if(WinUtil.IsAppX && !IsBuildType(
+				"CDE75CF0D4CA04D577A5A2E6BF5D19BFD5DDBBCF89D340FBBB0E4592C04496F1"))
+				return false;
+
 			try { SelfTest.TestFipsComplianceProblems(); }
 			catch(Exception exFips)
 			{
@@ -559,18 +578,27 @@ namespace KeePass
 
 			AppPolicy.Current = m_appConfig.Security.Policy.CloneDeep();
 
+			if(m_appConfig.Security.ProtectProcessWithDacl)
+				KeePassLib.Native.NativeMethods.ProtectProcessWithDacl();
+
 			m_appConfig.Apply(AceApplyFlags.All);
 
 			m_ecasTriggers = m_appConfig.Application.TriggerSystem;
 			m_ecasTriggers.SetToInitialState();
 
-			string strHelpFile = UrlUtil.StripExtension(WinUtil.GetExecutable()) + ".chm";
-			AppHelp.LocalHelpFile = strHelpFile;
-
 			// InitEnvWorkarounds();
 			LoadTranslation();
 
 			CustomResourceManager.Override(typeof(KeePass.Properties.Resources));
+
+#if KP_DEVSNAP
+			if(!m_bAsmResReg)
+			{
+				AppDomain.CurrentDomain.AssemblyResolve += Program.AssemblyResolve;
+				m_bAsmResReg = true;
+			}
+			else { Debug.Assert(false); }
+#endif
 
 			return true;
 		}
@@ -593,6 +621,15 @@ namespace KeePass
 
 			EnableThemingInScope.StaticDispose();
 			MonoWorkarounds.Terminate();
+
+#if KP_DEVSNAP
+			if(m_bAsmResReg)
+			{
+				AppDomain.CurrentDomain.AssemblyResolve -= Program.AssemblyResolve;
+				m_bAsmResReg = false;
+			}
+			else { Debug.Assert(false); }
+#endif
 		}
 
 		private static void MainCleanUp()
@@ -604,6 +641,16 @@ namespace KeePass
 			GlobalMutexPool.ReleaseAll();
 
 			CommonTerminate();
+		}
+
+		private static void ShowFatal(Exception ex)
+		{
+			if(ex == null) { Debug.Assert(false); return; }
+
+			// Catch message box exception;
+			// https://sourceforge.net/p/keepass/patches/86/
+			try { MessageService.ShowFatal(ex); }
+			catch(Exception) { Console.Error.WriteLine(ex.ToString()); }
 		}
 
 		private static void InitEnvSecurity()
@@ -703,14 +750,17 @@ namespace KeePass
 		// For plugins
 		public static void NotifyUserActivity()
 		{
-			if(Program.m_formMain != null) Program.m_formMain.NotifyUserActivity();
+			MainForm mf = m_formMain;
+			if(mf != null) mf.NotifyUserActivity();
 		}
 
 		public static IntPtr GetSafeMainWindowHandle()
 		{
-			if(m_formMain == null) return IntPtr.Zero;
-
-			try { return m_formMain.Handle; }
+			try
+			{
+				MainForm mf = m_formMain;
+				if(mf != null) return mf.Handle;
+			}
 			catch(Exception) { Debug.Assert(false); }
 
 			return IntPtr.Zero;
@@ -731,52 +781,70 @@ namespace KeePass
 
 		private static void LoadTranslation()
 		{
-			string strLangFile = m_appConfig.Application.LanguageFile;
-			if(string.IsNullOrEmpty(strLangFile)) return;
+			string strPath = m_appConfig.Application.GetLanguageFilePath();
+			if(string.IsNullOrEmpty(strPath)) return;
 
-			string[] vLangDirs = new string[]{
-				AppConfigSerializer.AppDataDirectory,
-				AppConfigSerializer.LocalAppDataDirectory,
-				UrlUtil.GetFileDirectory(WinUtil.GetExecutable(), false, false)
-			};
-
-			foreach(string strLangDir in vLangDirs)
+			try
 			{
-				string strLangPath = UrlUtil.EnsureTerminatingSeparator(
-					strLangDir, false) + strLangFile;
+				// Performance optimization
+				if(!File.Exists(strPath)) return;
 
-				try
-				{
-					// Performance optimization
-					if(!File.Exists(strLangPath)) continue;
+				XmlSerializerEx xs = new XmlSerializerEx(typeof(KPTranslation));
+				m_kpTranslation = KPTranslation.Load(strPath, xs);
 
-					XmlSerializerEx xs = new XmlSerializerEx(typeof(KPTranslation));
-					m_kpTranslation = KPTranslation.Load(strLangPath, xs);
+				KPRes.SetTranslatedStrings(
+					m_kpTranslation.SafeGetStringTableDictionary(
+					"KeePass.Resources.KPRes"));
+				KLRes.SetTranslatedStrings(
+					m_kpTranslation.SafeGetStringTableDictionary(
+					"KeePassLib.Resources.KLRes"));
 
-					KPRes.SetTranslatedStrings(
-						m_kpTranslation.SafeGetStringTableDictionary(
-						"KeePass.Resources.KPRes"));
-					KLRes.SetTranslatedStrings(
-						m_kpTranslation.SafeGetStringTableDictionary(
-						"KeePassLib.Resources.KLRes"));
-
-					StrUtil.RightToLeft = m_kpTranslation.Properties.RightToLeft;
-					break;
-				}
-				// catch(DirectoryNotFoundException) { } // Ignore
-				// catch(FileNotFoundException) { } // Ignore
-				catch(Exception) { Debug.Assert(false); }
+				StrUtil.RightToLeft = m_kpTranslation.Properties.RightToLeft;
 			}
+			// catch(DirectoryNotFoundException) { } // Ignore
+			// catch(FileNotFoundException) { } // Ignore
+			catch(Exception) { Debug.Assert(false); }
+		}
+
+		internal static bool IsStableAssembly()
+		{
+			try
+			{
+				Assembly asm = typeof(Program).Assembly;
+				byte[] pk = asm.GetName().GetPublicKeyToken();
+				string strPk = MemUtil.ByteArrayToHexString(pk);
+				Debug.Assert(strPk.Length == 16);
+				return string.Equals(strPk, "fed2ed7716aecf5c", StrUtil.CaseIgnoreCmp);
+			}
+			catch(Exception) { Debug.Assert(false); }
+
+			return false;
 		}
 
 		internal static bool IsDevelopmentSnapshot()
 		{
+#if KP_DEVSNAP
+			return true;
+#else
+			return !IsStableAssembly();
+#endif
+		}
+
+		private static bool IsBuildType(string str)
+		{
 			try
 			{
-				Assembly asm = Assembly.GetExecutingAssembly();
-				byte[] pk = asm.GetName().GetPublicKeyToken();
-				string strPk = MemUtil.ByteArrayToHexString(pk);
-				return !strPk.Equals("fed2ed7716aecf5c", StrUtil.CaseIgnoreCmp);
+				string strFile = UrlUtil.GetFileDirectory(WinUtil.GetExecutable(),
+					true, false) + "Application.ini";
+				if(!File.Exists(strFile)) return false;
+
+				IniFile f = IniFile.Read(strFile, StrUtil.Utf8);
+				string strType = f.Get("Application", "Type");
+				if(string.IsNullOrEmpty(strType)) return false;
+
+				byte[] pb = CryptoUtil.HashSha256(StrUtil.Utf8.GetBytes(strType.Trim()));
+				return string.Equals(MemUtil.ByteArrayToHexString(pb),
+					str, StrUtil.CaseIgnoreCmp);
 			}
 			catch(Exception) { Debug.Assert(false); }
 
@@ -790,7 +858,7 @@ namespace KeePass
 
 		/* private static void InitFtpWorkaround()
 		{
-			// http://support.microsoft.com/kb/2134299
+			// https://support.microsoft.com/kb/2134299
 			// https://connect.microsoft.com/VisualStudio/feedback/details/621450/problem-renaming-file-on-ftp-server-using-ftpwebrequest-in-net-framework-4-0-vs2010-only
 			try
 			{
@@ -828,5 +896,31 @@ namespace KeePass
 			}
 			catch(Exception) { Debug.Assert(false); }
 		} */
+
+#if KP_DEVSNAP
+		private static Assembly AssemblyResolve(object sender, ResolveEventArgs e)
+		{
+			string str = ((e != null) ? e.Name : null);
+			if(string.IsNullOrEmpty(str)) { Debug.Assert(false); return null; }
+
+			try
+			{
+				AssemblyName n = new AssemblyName(str);
+				if(string.Equals(n.Name, "KeePass", StrUtil.CaseIgnoreCmp))
+					return typeof(KeePass.Program).Assembly;
+			}
+			catch(Exception)
+			{
+				Debug.Assert(false);
+
+				if(str.Equals("KeePass", StrUtil.CaseIgnoreCmp) ||
+					str.StartsWith("KeePass,", StrUtil.CaseIgnoreCmp))
+					return typeof(KeePass.Program).Assembly;
+			}
+
+			Debug.Assert(false);
+			return null;
+		}
+#endif
 	}
 }

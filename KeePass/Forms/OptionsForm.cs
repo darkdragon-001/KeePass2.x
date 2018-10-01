@@ -1,6 +1,6 @@
 /*
   KeePass Password Safe - The Open-Source Password Manager
-  Copyright (C) 2003-2017 Dominik Reichl <dominik.reichl@t-online.de>
+  Copyright (C) 2003-2018 Dominik Reichl <dominik.reichl@t-online.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -333,6 +333,8 @@ namespace KeePass.Forms
 				lvg, KPRes.MasterKeyOnSecureDesktop, obNoWin);
 			m_cdxSecurityOptions.CreateItem(Program.Config.Security, "ClearKeyCommandLineParams",
 				lvg, KPRes.ClearKeyCmdLineParams);
+			m_cdxSecurityOptions.CreateItem(Program.Config.Security.MasterPassword,
+				"RememberWhileOpen", lvg, KPRes.MasterPasswordRmbWhileOpen);
 
 			m_cdxSecurityOptions.UpdateData(false);
 			UIUtil.ResizeColumns(m_lvSecurityOptions, true);
@@ -396,6 +398,8 @@ namespace KeePass.Forms
 				lvg, KPRes.DropToBackOnCopy);
 			m_cdxGuiOptions.CreateItem(Program.Config.MainWindow, "MinimizeAfterClipboardCopy",
 				lvg, KPRes.MinimizeAfterCopy);
+			m_cdxGuiOptions.CreateItem(Program.Config.MainWindow, "MinimizeAfterAutoType",
+				lvg, KPRes.MinimizeAfterAutoType);
 			m_cdxGuiOptions.CreateItem(Program.Config.MainWindow, "MinimizeAfterLocking",
 				lvg, KPRes.MinimizeAfterLocking);
 			m_cdxGuiOptions.CreateItem(Program.Config.MainWindow, "MinimizeAfterOpeningDatabase",
@@ -478,6 +482,8 @@ namespace KeePass.Forms
 				lvg, KPRes.RecycleShowConfirm);
 			m_cdxGuiOptions.CreateItem(Program.Config.UI, "ShowDbMntncResultsDialog",
 				lvg, KPRes.DbMntncResults);
+			m_cdxGuiOptions.CreateItem(Program.Config.UI, "ShowEmSheetDialog",
+				lvg, KPRes.EmergencySheetAsk);
 
 			lvg = new ListViewGroup(KPRes.Advanced);
 			m_lvGuiOptions.Groups.Add(lvg);
@@ -485,6 +491,8 @@ namespace KeePass.Forms
 				lvg, KPRes.RepeatOnlyWhenHidden);
 			// m_cdxGuiOptions.CreateItem(Program.Config.UI, "UseCustomToolStripRenderer",
 			//	lvg, KPRes.UseCustomToolStripRenderer);
+			m_cdxGuiOptions.CreateItem(Program.Config.UI, "TreeViewShowLines",
+				lvg, KPRes.TreeViewShowLines);
 			m_cdxGuiOptions.CreateItem(Program.Config.UI, "ForceSystemFontUnix",
 				lvg, KPRes.ForceSystemFontUnix);
 
@@ -564,6 +572,8 @@ namespace KeePass.Forms
 				lvg, KPRes.StartMinimizedAndLocked, obNoMin);
 			m_cdxAdvanced.CreateItem(Program.Config.Application.FileClosing, "AutoSave",
 				lvg, KPRes.AutoSaveAtExit);
+			m_cdxAdvanced.CreateItem(Program.Config.Application, "AutoSaveAfterEntryEdit",
+				lvg, KPRes.AutoSaveAfterEntryEdit);
 
 			lvg = new ListViewGroup(KPRes.AfterDatabaseOpen);
 			m_lvAdvanced.Groups.Add(lvg);

@@ -1,6 +1,6 @@
 ﻿/*
   KeePass Password Safe - The Open-Source Password Manager
-  Copyright (C) 2003-2017 Dominik Reichl <dominik.reichl@t-online.de>
+  Copyright (C) 2003-2018 Dominik Reichl <dominik.reichl@t-online.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ namespace KeePass.Util
 					Form f = GlobalWindowManager.TopWindow;
 					h = ((f != null) ? f.Handle : IntPtr.Zero);
 
-					if(h == IntPtr.Zero) h = Program.MainForm.Handle;
+					if(h == IntPtr.Zero) h = Program.GetSafeMainWindowHandle();
 				}
 				catch(Exception) { Debug.Assert(false); }
 			}
@@ -92,7 +92,8 @@ namespace KeePass.Util
 
 		private static string GetStringW(string strFormat, bool? bForceUni)
 		{
-			bool bUni = (bForceUni.HasValue ? bForceUni.Value : WinUtil.IsAtLeastWindows2000);
+			bool bUni = (bForceUni.HasValue ? bForceUni.Value :
+				(Marshal.SystemDefaultCharSize >= 2));
 
 			uint uFormat = (bUni ? NativeMethods.CF_UNICODETEXT : NativeMethods.CF_TEXT);
 			if(!string.IsNullOrEmpty(strFormat))
@@ -154,7 +155,8 @@ namespace KeePass.Util
 		{
 			if(strData == null) { Debug.Assert(false); return false; }
 
-			bool bUni = (bForceUni.HasValue ? bForceUni.Value : WinUtil.IsAtLeastWindows2000);
+			bool bUni = (bForceUni.HasValue ? bForceUni.Value :
+				(Marshal.SystemDefaultCharSize >= 2));
 
 			uint uFmt = (uFormat.HasValue ? uFormat.Value : (bUni ?
 				NativeMethods.CF_UNICODETEXT : NativeMethods.CF_TEXT));

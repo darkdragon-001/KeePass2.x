@@ -1,6 +1,6 @@
 ﻿/*
   KeePass Password Safe - The Open-Source Password Manager
-  Copyright (C) 2003-2017 Dominik Reichl <dominik.reichl@t-online.de>
+  Copyright (C) 2003-2018 Dominik Reichl <dominik.reichl@t-online.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
 using KeePassLib.Utility;
@@ -208,6 +209,11 @@ namespace KeePass.UI
 
 		public void Build(RichTextBox rtb)
 		{
+			Build(rtb, false);
+		}
+
+		internal void Build(RichTextBox rtb, bool bBracesBalanced)
+		{
 			if(rtb == null) throw new ArgumentNullException("rtb");
 
 			RichTextBox rtbOp = CreateOpRtb(rtb);
@@ -257,7 +263,11 @@ namespace KeePass.UI
 				strRtf = strRtf.Replace(rTag.IdCode, rTag.RtfCode);
 			}
 
-			rtb.Rtf = strRtf;
+			if(bBracesBalanced && MonoWorkarounds.IsRequired(2449941153U))
+				strRtf = Regex.Replace(strRtf,
+					@"(\\)(\{[\u0020-\u005B\u005D-z\w\s]*?)(\})", "$1$2$1$3");
+
+			rtb.Rtf = StrUtil.RtfFix(strRtf);
 		}
 	}
 }

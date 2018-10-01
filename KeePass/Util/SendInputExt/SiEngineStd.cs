@@ -1,6 +1,6 @@
 ﻿/*
   KeePass Password Safe - The Open-Source Password Manager
-  Copyright (C) 2003-2017 Dominik Reichl <dominik.reichl@t-online.de>
+  Copyright (C) 2003-2018 Dominik Reichl <dominik.reichl@t-online.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -32,12 +32,12 @@ using KeePassLib.Utility;
 
 namespace KeePass.Util.SendInputExt
 {
-	public abstract class SiEngineStd : ISiEngine
+	internal abstract class SiEngineStd : ISiEngine
 	{
-		public IntPtr TargetHWnd = IntPtr.Zero;
-		public string TargetWindowTitle = string.Empty;
+		protected IntPtr TargetHWnd = IntPtr.Zero;
+		protected string TargetWindowTitle = string.Empty;
 
-		public bool Cancelled = false;
+		protected bool Cancelled = false;
 
 		private Stopwatch m_swLastEvent = new Stopwatch();
 #if DEBUG

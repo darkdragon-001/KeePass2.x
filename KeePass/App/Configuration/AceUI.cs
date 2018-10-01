@@ -1,6 +1,6 @@
 /*
   KeePass Password Safe - The Open-Source Password Manager
-  Copyright (C) 2003-2017 Dominik Reichl <dominik.reichl@t-online.de>
+  Copyright (C) 2003-2018 Dominik Reichl <dominik.reichl@t-online.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -61,9 +61,12 @@ namespace KeePass.App.Configuration
 		DisableKeyChangeDays = 0x8,
 		HidePwQuality = 0x10,
 		DisableUpdateCheck = 0x20,
+		DisableXmlReplace = 0x40,
 
 		HideBuiltInPwGenPrfInEntryDlg = 0x10000,
-		ShowLastAccessTime = 0x20000
+		ShowLastAccessTime = 0x20000,
+		HideNewDbInfoDialogs = 0x40000,
+		HideAutoTypeObfInfo = 0x80000
 	}
 
 	[Flags]
@@ -155,8 +158,8 @@ namespace KeePass.App.Configuration
 			set { m_bannerStyle = value; }
 		}
 
-		private bool m_bShowImportStatusDlg = true;
-		[DefaultValue(true)]
+		private bool m_bShowImportStatusDlg = false;
+		[DefaultValue(false)]
 		public bool ShowImportStatusDialog
 		{
 			get { return m_bShowImportStatusDlg; }
@@ -179,6 +182,14 @@ namespace KeePass.App.Configuration
 			set { m_bShowRecycleDlg = value; }
 		}
 
+		private bool m_bShowEmSheetDlg = true;
+		[DefaultValue(true)]
+		public bool ShowEmSheetDialog
+		{
+			get { return m_bShowEmSheetDlg; }
+			set { m_bShowEmSheetDlg = value; }
+		}
+
 		// private bool m_bUseCustomTsRenderer = true;
 		// [DefaultValue(true)]
 		// public bool UseCustomToolStripRenderer
@@ -197,6 +208,14 @@ namespace KeePass.App.Configuration
 				if(value == null) throw new ArgumentNullException("value");
 				m_strToolStripRenderer = value;
 			}
+		}
+
+		private bool m_bTreeViewShowLines = false;
+		[DefaultValue(false)]
+		public bool TreeViewShowLines
+		{
+			get { return m_bTreeViewShowLines; }
+			set { m_bTreeViewShowLines = value; }
 		}
 
 		private bool m_bOptScreenReader = false;

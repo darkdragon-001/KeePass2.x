@@ -1,6 +1,6 @@
 ﻿/*
   KeePass Password Safe - The Open-Source Password Manager
-  Copyright (C) 2003-2017 Dominik Reichl <dominik.reichl@t-online.de>
+  Copyright (C) 2003-2018 Dominik Reichl <dominik.reichl@t-online.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -20,11 +20,11 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.IO;
-using System.Globalization;
-using System.Diagnostics;
 
 using KeePass.App.Configuration;
 using KeePass.Forms;
@@ -371,11 +371,11 @@ namespace KeePass.Util.Spr
 
 			if(ctx != null)
 			{
-				if(ctx.EncodeQuotesForCommandLine)
-					str = SprEncoding.MakeCommandQuotes(str);
+				if(ctx.EncodeForCommandLine)
+					str = SprEncoding.EncodeForCommandLine(str);
 
 				if(ctx.EncodeAsAutoTypeSequence)
-					str = SprEncoding.MakeAutoTypeSequence(str);
+					str = SprEncoding.EncodeAsAutoTypeSequence(str);
 			}
 
 			return str;
@@ -636,7 +636,7 @@ namespace KeePass.Util.Spr
 		//	return (strText.IndexOfAny(m_vPlhEscapes) >= 0);
 		// }
 
-		internal static bool MightChange(string str)
+		/* internal static bool MightChange(string str)
 		{
 			if(str == null) { Debug.Assert(false); return false; }
 
@@ -651,6 +651,27 @@ namespace KeePass.Util.Spr
 			if(iPFirst >= 0)
 			{
 				int iPLast = str.LastIndexOf('%');
+				if(iPFirst < iPLast) return true;
+			}
+
+			return false;
+		} */
+
+		internal static bool MightChange(char[] v)
+		{
+			if(v == null) { Debug.Assert(false); return false; }
+
+			int iBStart = Array.IndexOf<char>(v, '{');
+			if(iBStart >= 0)
+			{
+				int iBEnd = Array.LastIndexOf<char>(v, '}');
+				if(iBStart < iBEnd) return true;
+			}
+
+			int iPFirst = Array.IndexOf<char>(v, '%');
+			if(iPFirst >= 0)
+			{
+				int iPLast = Array.LastIndexOf<char>(v, '%');
 				if(iPFirst < iPLast) return true;
 			}
 
@@ -835,9 +856,10 @@ namespace KeePass.Util.Spr
 				string strCmd = lParams[0];
 				if(string.IsNullOrEmpty(strCmd)) continue;
 
+				Process p = null;
 				try
 				{
-					const StringComparison sc = StrUtil.CaseIgnoreCmp;
+					StringComparison sc = StrUtil.CaseIgnoreCmp;
 
 					string strOpt = ((lParams.Count >= 2) ? lParams[1] :
 						string.Empty);
@@ -847,6 +869,8 @@ namespace KeePass.Util.Spr
 
 					string strApp, strArgs;
 					StrUtil.SplitCommandLine(strCmd, out strApp, out strArgs);
+					strApp = WinUtil.CompileUrl((strApp ?? string.Empty),
+						((ctx != null) ? ctx.Entry : null), true, null);
 					if(string.IsNullOrEmpty(strApp)) continue;
 					psi.FileName = strApp;
 					if(!string.IsNullOrEmpty(strArgs))
@@ -878,7 +902,7 @@ namespace KeePass.Util.Spr
 
 					bool bWait = GetParam(d, "w", "1").Equals("1", sc);
 
-					Process p = Process.Start(psi);
+					p = Process.Start(psi);
 					if(p == null) { Debug.Assert(false); continue; }
 
 					if(bStdOut)
@@ -894,6 +918,11 @@ namespace KeePass.Util.Spr
 				{
 					string strMsg = strCmd + MessageService.NewParagraph + ex.Message;
 					MessageService.ShowWarning(strMsg);
+				}
+				finally
+				{
+					try { if(p != null) p.Dispose(); }
+					catch(Exception) { Debug.Assert(false); }
 				}
 			}
 

@@ -1,6 +1,6 @@
 /*
   KeePass Password Safe - The Open-Source Password Manager
-  Copyright (C) 2003-2017 Dominik Reichl <dominik.reichl@t-online.de>
+  Copyright (C) 2003-2018 Dominik Reichl <dominik.reichl@t-online.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -101,7 +101,7 @@ namespace KeePass.Util
 				// not required:
 
 				// // Enable new SendInput method; see
-				// // http://msdn.microsoft.com/en-us/library/system.windows.forms.sendkeys.aspx
+				// // https://msdn.microsoft.com/en-us/library/system.windows.forms.sendkeys.aspx
 				// ConfigurationManager.AppSettings.Set("SendKeys", "SendInput");
 			}
 			catch(Exception) { Debug.Assert(false); }
@@ -227,6 +227,10 @@ namespace KeePass.Util
 				// SprEngine.Compile might have modified the database;
 				// pd.Modified is set by SprEngine
 				mf.UpdateUI(false, null, false, null, false, null, false);
+
+				if(Program.Config.MainWindow.MinimizeAfterAutoType &&
+					mf.IsCommandTypeInvokable(null, MainForm.AppCommandType.Window))
+					UIUtil.SetWindowState(mf, FormWindowState.Minimized);
 			}
 
 			return true;
@@ -426,7 +430,7 @@ namespace KeePass.Util
 
 		internal static bool IsOwnWindow(IntPtr hWindow)
 		{
-			return ((hWindow == Program.MainForm.Handle) ||
+			return ((hWindow == Program.GetSafeMainWindowHandle()) ||
 				GlobalWindowManager.HasWindow(hWindow));
 		}
 

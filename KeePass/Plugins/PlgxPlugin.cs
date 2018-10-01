@@ -1,6 +1,6 @@
 ﻿/*
   KeePass Password Safe - The Open-Source Password Manager
-  Copyright (C) 2003-2017 Dominik Reichl <dominik.reichl@t-online.de>
+  Copyright (C) 2003-2018 Dominik Reichl <dominik.reichl@t-online.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -18,17 +18,17 @@
 */
 
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Text;
-using System.IO;
-using System.IO.Compression;
-using System.Diagnostics;
-using System.Windows.Forms;
 using System.CodeDom;
 using System.CodeDom.Compiler;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.IO.Compression;
 using System.Resources;
 using System.Security.Cryptography;
+using System.Text;
+using System.Windows.Forms;
 
 using Microsoft.CSharp;
 // using Microsoft.VisualBasic;
@@ -67,7 +67,7 @@ namespace KeePass.Plugins
 
 	public static class PlgxPlugin
 	{
-		public const string PlgxExtension = "plgx";
+		public static readonly string PlgxExtension = "plgx";
 
 		private const uint PlgxSignature1 = 0x65D90719;
 		private const uint PlgxSignature2 = 0x3DDD0503;
@@ -470,7 +470,9 @@ namespace KeePass.Plugins
 		private static void RecursiveFileAdd(BinaryWriter bw, string strRootDir,
 			DirectoryInfo di)
 		{
+			if(di.Name.Equals(".git", StrUtil.CaseIgnoreCmp)) return; // Skip Git
 			if(di.Name.Equals(".svn", StrUtil.CaseIgnoreCmp)) return; // Skip SVN
+			if(di.Name.Equals(".vs", StrUtil.CaseIgnoreCmp)) return; // Skip VS
 
 			foreach(FileInfo fi in di.GetFiles())
 			{
@@ -790,18 +792,23 @@ namespace KeePass.Plugins
 			string strApp, strArgs;
 			StrUtil.SplitCommandLine(str, out strApp, out strArgs);
 
+			Process p = null;
 			try
 			{
-				if((strArgs != null) && (strArgs.Length > 0))
-					Process.Start(strApp, strArgs);
-				else
-					Process.Start(strApp);
+				if(!string.IsNullOrEmpty(strArgs))
+					p = Process.Start(strApp, strArgs);
+				else p = Process.Start(strApp);
 			}
-			catch(Exception exRun)
+			catch(Exception ex)
 			{
 				if(Program.CommandLineArgs[AppDefs.CommandLineOptions.Debug] != null)
-					throw new PlgxException(exRun.Message);
+					throw new PlgxException(ex.Message);
 				throw;
+			}
+			finally
+			{
+				try { if(p != null) p.Dispose(); }
+				catch(Exception) { Debug.Assert(false); }
 			}
 		}
 	}

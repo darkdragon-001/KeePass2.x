@@ -1,6 +1,6 @@
 /*
   KeePass Password Safe - The Open-Source Password Manager
-  Copyright (C) 2003-2017 Dominik Reichl <dominik.reichl@t-online.de>
+  Copyright (C) 2003-2018 Dominik Reichl <dominik.reichl@t-online.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -91,7 +91,7 @@ namespace KeePass.Forms
 		{
 			int nBits = m_llPool.Count / 8;
 			Debug.Assert(!m_lblStatus.AutoSize); // For RTL support
-			m_lblStatus.Text = nBits.ToString() + " " + KPRes.BitsStc;
+			m_lblStatus.Text = KPRes.BitsEx.Replace(@"{PARAM}", nBits.ToString());
 
 			if(nBits > 256) { Debug.Assert(false); m_pbGenerated.Value = 100; }
 			else m_pbGenerated.Value = (nBits * 100) / 256;

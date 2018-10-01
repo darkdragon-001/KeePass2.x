@@ -1,6 +1,6 @@
 /*
   KeePass Password Safe - The Open-Source Password Manager
-  Copyright (C) 2003-2017 Dominik Reichl <dominik.reichl@t-online.de>
+  Copyright (C) 2003-2018 Dominik Reichl <dominik.reichl@t-online.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -38,6 +38,8 @@ namespace KeePass.UI
 	{
 		public QualityProgressBar() : base()
 		{
+			if(Program.DesignMode) return;
+
 			this.DoubleBuffered = true;
 		}
 
@@ -73,6 +75,7 @@ namespace KeePass.UI
 			get { return m_pbsStyle; }
 			set { m_pbsStyle = value; this.Invalidate(); }
 		}
+		public bool ShouldSerializeStyle() { return false; }
 
 		private string m_strText = string.Empty;
 		[DefaultValue("")]
@@ -163,10 +166,10 @@ namespace KeePass.UI
 					rectDraw.Left), rectDraw.Top, nDrawWidth, rectDraw.Height);
 			}
 
-			PaintText(g, rectDraw);
+			PaintText(g, rectDraw, bRtl);
 		}
 
-		private void PaintText(Graphics g, Rectangle rectDraw)
+		private void PaintText(Graphics g, Rectangle rectDraw, bool bRtl)
 		{
 			if(string.IsNullOrEmpty(m_strText)) return;
 
@@ -217,6 +220,8 @@ namespace KeePass.UI
 			{
 				StringFormatFlags sff = (StringFormatFlags.FitBlackBox |
 					StringFormatFlags.NoClip);
+				if(bRtl) sff |= StringFormatFlags.DirectionRightToLeft;
+
 				using(StringFormat sf = new StringFormat(sff))
 				{
 					sf.Alignment = StringAlignment.Center;

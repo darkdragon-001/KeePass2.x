@@ -1,6 +1,6 @@
 /*
   KeePass Password Safe - The Open-Source Password Manager
-  Copyright (C) 2003-2017 Dominik Reichl <dominik.reichl@t-online.de>
+  Copyright (C) 2003-2018 Dominik Reichl <dominik.reichl@t-online.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -19,18 +19,18 @@
 
 using System;
 using System.Collections.Generic;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Windows.Forms;
-using System.Windows.Forms.VisualStyles;
-using System.Runtime.InteropServices;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
-using System.Threading;
 using System.IO;
 using System.Media;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Windows.Forms;
+using System.Windows.Forms.VisualStyles;
 
 using Microsoft.Win32;
 
@@ -413,26 +413,31 @@ namespace KeePass.UI
 
 		private static void SetCueBanner(IntPtr hWnd, string strText)
 		{
-			Debug.Assert(strText != null); if(strText == null) throw new ArgumentNullException("strText");
+			if(hWnd == IntPtr.Zero) { Debug.Assert(false); return; }
+			if(strText == null) { Debug.Assert(false); strText = string.Empty; }
 
-			IntPtr pText = IntPtr.Zero;
+			IntPtr p = IntPtr.Zero;
 			try
 			{
-				pText = Marshal.StringToHGlobalUni(strText);
+				p = Marshal.StringToCoTaskMemUni(strText);
 				NativeMethods.SendMessage(hWnd, NativeMethods.EM_SETCUEBANNER,
-					IntPtr.Zero, pText);
+					IntPtr.Zero, p);
 			}
 			catch(Exception) { Debug.Assert(NativeLib.IsUnix()); }
-			finally { if(pText != IntPtr.Zero) Marshal.FreeHGlobal(pText); }
+			finally { if(p != IntPtr.Zero) Marshal.FreeCoTaskMem(p); }
 		}
 
 		public static void SetCueBanner(TextBox tb, string strText)
 		{
+			if(tb == null) { Debug.Assert(false); return; }
+
 			SetCueBanner(tb.Handle, strText);
 		}
 
 		public static void SetCueBanner(ToolStripTextBox tb, string strText)
 		{
+			if(tb == null) { Debug.Assert(false); return; }
+
 			SetCueBanner(tb.TextBox, strText);
 		}
 
@@ -491,22 +496,21 @@ namespace KeePass.UI
 		public static void PrepareStandardMultilineControl(RichTextBox rtb,
 			bool bSimpleTextOnly, bool bCtrlEnterAccepts)
 		{
-			Debug.Assert(rtb != null); if(rtb == null) throw new ArgumentNullException("rtb");
+			if(rtb == null) { Debug.Assert(false); return; }
 
-			try
-			{
-				int nStyle = NativeMethods.GetWindowStyle(rtb.Handle);
-
-				if((nStyle & NativeMethods.ES_WANTRETURN) == 0)
-				{
-					NativeMethods.SetWindowLong(rtb.Handle, NativeMethods.GWL_STYLE,
-						nStyle | NativeMethods.ES_WANTRETURN);
-
-					Debug.Assert((NativeMethods.GetWindowStyle(rtb.Handle) &
-						NativeMethods.ES_WANTRETURN) != 0);
-				}
-			}
-			catch(Exception) { }
+			// See CustomRichTextBoxEx.CreateParams
+			// try
+			// {
+			//	int nStyle = NativeMethods.GetWindowStyle(rtb.Handle);
+			//	if((nStyle & NativeMethods.ES_WANTRETURN) == 0)
+			//	{
+			//		NativeMethods.SetWindowLong(rtb.Handle, NativeMethods.GWL_STYLE,
+			//			nStyle | NativeMethods.ES_WANTRETURN);
+			//		Debug.Assert((NativeMethods.GetWindowStyle(rtb.Handle) &
+			//			NativeMethods.ES_WANTRETURN) != 0);
+			//	}
+			// }
+			// catch(Exception) { }
 
 			CustomRichTextBoxEx crtb = (rtb as CustomRichTextBoxEx);
 			if(crtb != null)
@@ -1684,8 +1688,7 @@ namespace KeePass.UI
 				IntPtr hHeader = NativeMethods.SendMessage(lv.Handle,
 					NativeMethods.LVM_GETHEADER, IntPtr.Zero, IntPtr.Zero);
 
-				bool bUnicode = (WinUtil.IsWindows2000 || WinUtil.IsWindowsXP ||
-					WinUtil.IsAtLeastWindowsVista);
+				bool bUnicode = (Marshal.SystemDefaultCharSize >= 2);
 				int nGetMsg = (bUnicode ? NativeMethods.HDM_GETITEMW :
 					NativeMethods.HDM_GETITEMA);
 				int nSetMsg = (bUnicode ? NativeMethods.HDM_SETITEMW :
@@ -1830,7 +1833,7 @@ namespace KeePass.UI
 
 				ContainerControl ccSub = (c as ContainerControl);
 				if(ccSub != null) return GetActiveControl(ccSub);
-				else return c;
+				return c;
 			}
 			catch(Exception) { Debug.Assert(false); }
 
@@ -1918,8 +1921,8 @@ namespace KeePass.UI
 				else
 				{
 					// In grouped mode, the TopItem property does not work;
-					// http://connect.microsoft.com/VisualStudio/feedback/details/642188/listview-control-bug-topitem-property-doesnt-work-with-groups
-					// http://msdn.microsoft.com/en-us/library/windows/desktop/bb761087.aspx
+					// https://connect.microsoft.com/VisualStudio/feedback/details/642188/listview-control-bug-topitem-property-doesnt-work-with-groups
+					// https://msdn.microsoft.com/en-us/library/windows/desktop/bb761087.aspx
 
 					int dyHeader = NativeMethods.GetHeaderHeight(lv);
 
@@ -2233,6 +2236,33 @@ namespace KeePass.UI
 			return GetWindowScreenRect(f);
 		}
 
+		internal static string ScaleWindowScreenRect(string strRect, double sX, double sY)
+		{
+			if(string.IsNullOrEmpty(strRect)) return strRect;
+
+			try
+			{
+				string str = strRect.Replace(",", string.Empty); // Backward compat.
+
+				int[] v = StrUtil.DeserializeIntArray(str);
+				if((v == null) || (v.Length < 2)) { Debug.Assert(false); return strRect; }
+
+				v[0] = (int)Math.Round((double)v[0] * sX); // X
+				v[1] = (int)Math.Round((double)v[1] * sY); // Y
+
+				if(v.Length >= 4)
+				{
+					v[2] = (int)Math.Round((double)v[2] * sX); // Width
+					v[3] = (int)Math.Round((double)v[3] * sY); // Height
+				}
+
+				return StrUtil.SerializeIntArray(v);
+			}
+			catch(Exception) { Debug.Assert(false); }
+
+			return strRect;
+		}
+
 		public static string GetColumnWidths(ListView lv)
 		{
 			if(lv == null) { Debug.Assert(false); return string.Empty; }
@@ -2340,7 +2370,49 @@ namespace KeePass.UI
 			cb.AutoCompleteSource = AutoCompleteSource.ListItems;
 		}
 
+		public static void EnableAutoCompletion(TextBox tb, bool bAlsoAutoAppend,
+			string[] vItems)
+		{
+			if((tb == null) || (vItems == null)) { Debug.Assert(false); return; }
+			if(vItems.Length == 0) return;
+
+			try
+			{
+				foreach(string str in vItems)
+				{
+					if(str == null) { Debug.Assert(false); return; }
+				}
+
+				// The system/framework sorts the auto-completion list
+
+				VoidDelegate f = delegate()
+				{
+					try
+					{
+						AutoCompleteStringCollection c = new AutoCompleteStringCollection();
+						c.AddRange(vItems);
+
+						tb.AutoCompleteCustomSource = c;
+						tb.AutoCompleteSource = AutoCompleteSource.CustomSource;
+						tb.AutoCompleteMode = (bAlsoAutoAppend ?
+							AutoCompleteMode.SuggestAppend : AutoCompleteMode.Suggest);
+					}
+					catch(Exception) { Debug.Assert(false); }
+				};
+
+				if(tb.InvokeRequired || MonoWorkarounds.IsRequired(373134))
+					tb.Invoke(f);
+				else f();
+			}
+			catch(Exception) { Debug.Assert(false); }
+		}
+
 		public static void SetFocus(Control c, Form fParent)
+		{
+			SetFocus(c, fParent, false);
+		}
+
+		public static void SetFocus(Control c, Form fParent, bool bToForegroundAndFocus)
 		{
 			if(c == null) { Debug.Assert(false); return; }
 			// fParent may be null
@@ -2354,12 +2426,20 @@ namespace KeePass.UI
 			try
 			{
 				if(c.CanSelect) c.Select();
-				if(c.CanFocus) c.Focus();
+
+				// https://sourceforge.net/p/keepass/discussion/329220/thread/045940bf/
+				// https://sourceforge.net/p/keepass/discussion/329220/thread/6834e222/
+				if(bToForegroundAndFocus && c.CanFocus) c.Focus();
 			}
 			catch(Exception) { Debug.Assert(false); }
 		}
 
 		public static void ResetFocus(Control c, Form fParent)
+		{
+			ResetFocus(c, fParent, false);
+		}
+
+		public static void ResetFocus(Control c, Form fParent, bool bToForegroundAndFocus)
 		{
 			if(c == null) { Debug.Assert(false); return; }
 			// fParent may be null
@@ -2367,7 +2447,7 @@ namespace KeePass.UI
 			try
 			{
 				Control cPre = null;
-				if(fParent != null) cPre = fParent.ActiveControl;
+				if(fParent != null) cPre = GetActiveControl(fParent);
 
 				bool bStdSetFocus = true;
 				if(c == cPre)
@@ -2395,7 +2475,7 @@ namespace KeePass.UI
 					}
 				}
 
-				if(bStdSetFocus) UIUtil.SetFocus(c, fParent);
+				if(bStdSetFocus) UIUtil.SetFocus(c, fParent, bToForegroundAndFocus);
 			}
 			catch(Exception) { Debug.Assert(false); }
 		}
@@ -2793,7 +2873,7 @@ namespace KeePass.UI
 					NativeMethods.ICON_BIG), IntPtr.Zero);
 				if(hIcon != IntPtr.Zero) return Icon.FromHandle(hIcon).ToBitmap();
 
-				hIcon = NativeMethods.GetClassLongPtr(hWnd, bPrefSmall ?
+				hIcon = NativeMethods.GetClassLongPtrEx(hWnd, bPrefSmall ?
 					NativeMethods.GCLP_HICONSM : NativeMethods.GCLP_HICON);
 				if(hIcon != IntPtr.Zero) return Icon.FromHandle(hIcon).ToBitmap();
 
@@ -2802,7 +2882,7 @@ namespace KeePass.UI
 					IntPtr.Zero);
 				if(hIcon != IntPtr.Zero) return Icon.FromHandle(hIcon).ToBitmap();
 
-				hIcon = NativeMethods.GetClassLongPtr(hWnd, bPrefSmall ?
+				hIcon = NativeMethods.GetClassLongPtrEx(hWnd, bPrefSmall ?
 					NativeMethods.GCLP_HICON : NativeMethods.GCLP_HICONSM);
 				if(hIcon != IntPtr.Zero) return Icon.FromHandle(hIcon).ToBitmap();
 
@@ -2898,19 +2978,6 @@ namespace KeePass.UI
 
 			tsmi.ShortcutKeyDisplayString = str;
 		}
-
-		/* public static string ImageToDataUri(Image img)
-		{
-			if(img == null) { Debug.Assert(false); return string.Empty; }
-
-			MemoryStream ms = new MemoryStream();
-			img.Save(ms, ImageFormat.Png);
-
-			byte[] pbImage = ms.ToArray();
-			ms.Close();
-
-			return StrUtil.DataToDataUri(pbImage, "image/png");
-		} */
 
 		public static void SetFocusedItem(ListView lv, ListViewItem lvi,
 			bool bAlsoSelect)
@@ -3326,6 +3393,66 @@ namespace KeePass.UI
 			if(i >= 0) return ((int)PwIcon.Count + i);
 			Debug.Assert(false);
 			return (int)pe.IconId;
+		}
+
+		internal static void SetView(ListView lv, View v)
+		{
+			if(lv == null) { Debug.Assert(false); return; }
+
+			if(lv.View != v) lv.View = v;
+		}
+
+		public static void PerformOverride<T>(ref T o)
+			where T : Control, new()
+		{
+			if(!TypeOverridePool.IsRegistered(typeof(T))) return;
+
+			T d = TypeOverridePool.CreateInstance<T>();
+
+			if((o != null) && (d != null))
+			{
+				d.Dock = o.Dock;
+				d.Location = o.Location;
+				d.Name = o.Name;
+				d.Size = o.Size;
+				d.TabIndex = o.TabIndex;
+				d.Text = o.Text;
+
+				TextBox tbO = (o as TextBox), tbD = (d as TextBox);
+				if(tbO != null)
+					tbD.UseSystemPasswordChar = tbO.UseSystemPasswordChar;
+
+				Control p = o.Parent;
+				if(p != null)
+				{
+					int i = p.Controls.IndexOf(o);
+					if(i >= 0)
+					{
+						p.SuspendLayout();
+						p.Controls.RemoveAt(i);
+						p.Controls.Add(d);
+						p.Controls.SetChildIndex(d, i);
+						p.ResumeLayout();
+					}
+					else { Debug.Assert(false); }
+				}
+				else { Debug.Assert(false); }
+			}
+
+			o = d;
+		}
+
+		private static int g_tLastDoEvents = 0;
+		internal static void DoEventsByTime(bool bForce)
+		{
+			int t = Environment.TickCount, tLast = g_tLastDoEvents;
+			int d = t - tLast;
+
+			if((d >= 50) || bForce || (tLast == 0))
+			{
+				g_tLastDoEvents = t;
+				Application.DoEvents();
+			}
 		}
 	}
 }
